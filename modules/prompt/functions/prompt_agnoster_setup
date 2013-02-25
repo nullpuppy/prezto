@@ -1,0 +1,282 @@
+#
+# Agnoster theme from https://gist.github.com/3712874
+#
+# Authors:
+#   agnoster (original)
+#	digitalformula (modified for compatibility with Prezto - https://github.com/sorin-ionescu/prezto)
+#
+# Original agnoster theme was written for Oh My Zsh - https://github.com/robbyrussell/oh-my-zsh
+# This modified version requires git.zsh from Oh My Zsh - put in ~/.yadr/zsh for automatic load
+
+# Load dependencies.
+pmodload 'helper'
+
+function prompt_agnoster_precmd {
+  setopt LOCAL_OPTIONS
+  unsetopt XTRACE KSH_ARRAYS
+
+  vcs_info 'prompt'
+
+  # if (( $+functions[git-info] )); then
+  #   git-info
+  # fi
+}
+
+# Begin a segment
+# Takes two arguments, background and foreground. Both can be omitted,
+# rendering default background/foreground.
+prompt_segment() {
+  local bg fg
+  [[ -n $1 ]] && bg="%K{$1}" || bg="%k"
+  [[ -n $2 ]] && fg="%F{$2}" || fg="%f"
+  if [[ $CURRENT_BG != 'NONE' && $1 != $CURRENT_BG ]]; then
+    echo -n " %{$bg%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR%{$fg%} "
+  else
+    echo -n "%{$bg%}%{$fg%} "
+  fi
+  CURRENT_BG=$1
+  [[ -n $3 ]] && echo -n $3
+}
+
+# End the prompt, closing any open segments
+prompt_end() {
+  if [[ -n $CURRENT_BG ]]; then
+    echo -n " %{%k%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR$1"
+  else
+    echo -n "%{%k%}"
+  fi
+  echo -n "%{%f%}"
+  CURRENT_BG=''
+}
+
+prompt_newline() {
+  if [[ -n $CURRENT_BG ]]; then
+    echo -n "%{%k%F{$CURRENT_BG}%}$SEGMENT_SEPARATOR\n"
+  else
+    echo -n "%{%k%}"
+  fi
+  echo -n "%{%f%}"
+  CURRENT_BG='NONE'
+}
+
+### Prompt components
+# Each component will draw itself, and hide itself if no information needs to be shown
+
+# Context: user@hostname (who am I and where am I)
+prompt_context() {
+  local user=`whoami`
+
+  if [[ "$user" != "$DEFAULT_USER" || -n "$SSH_CLIENT" ]]; then
+    prompt_segment black default "%(!.%{%F{yellow}%}.)$user@%m"
+  fi
+}
+
+prompt_vcs() {
+  if $(git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
+    if [[ -n ${$(git ls-files --exclude-standard --others | head -n 1)} ]];  then
+      prompt_segment yellow black "${vcs_info_msg_0_}"
+    else
+      prompt_segment green black "${vcs_info_msg_0_}"
+    fi
+  fi
+}
+
+prompt_dir() {
+  # Split each dir into separate segments.
+  segments=(${(s:/:)${(%):-%~}})
+  firstpart=''
+  for ((i = 1; i <= ${#segments[@]}; ++i)); do
+    if [[ "$i" != "${#segments[@]}" ]]; then
+      if [[ "${segments[$i]}" == "~" ]]; then
+        firstpart="${segments[$i]:0:1}/"
+      else
+        if [[ "$i" == 1 ]]; then
+          firstpart="/"
+        fi
+        if [[ "${segments[$i]:0:1}" == "." ]]; then
+          firstpart="$firstpart${segments[$i]:0:2}/"
+        else
+          firstpart="$firstpart${segments[$i]:0:1}/"
+        fi
+      fi
+    fi
+  done
+  if [[ "$firstpart" != "" ]]; then
+      prompt_segment white black $firstpart
+  fi
+  if [[ "$firstpart" == "" && "${segments[1]}" != "~" ]]; then
+    prompt_segment blue black "/${segments[${#segments[@]}]}/"
+  else
+    prompt_segment blue black "${segments[${#segments[@]}]}/"
+  fi
+  # prompt_segment blue black `get_short_path`
+}
+
+prompt_editor_info() {
+  prompt_segment green black "${editor_info[overwrite]}${editor_info[keymap]}"
+}
+# Status:
+# - was there an error
+# - am I root
+# - are there background jobs?
+prompt_status() {
+  local symbols
+  symbols=()
+  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{white}%}✘"
+  [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}⚡"
+  [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{white}%}⚙"
+
+  [[ -n "$symbols" ]] && [[ $RETVAL -ne 0 ]] && prompt_segment red red "$symbols"
+  [[ -n "$symbols" ]] && [[ $RETVAL -eq 0 ]] && prompt_segment green green "$symbols"
+  [[ -z "$symbols" ]] && prompt_segment blue black " "
+}
+
+### current time
+### function added by digitalformula
+prompt_time() {
+  prompt_segment white black "`date +%H:%M:%S`"
+}
+
+### current hostname
+### function added by digitalformula
+prompt_hostname() {
+  hostname=`hostname`
+  prompt_segment yellow black "$hostname"
+}
+
+## Main prompt (Old version, includes currect directory)
+build_prompt() {
+  RETVAL=$?
+  prompt_time
+  prompt_editor_info
+  prompt_hostname
+  prompt_dir
+  prompt_vcs
+  prompt_newline
+  prompt_status
+  prompt_end
+}
+
+function prompt_agnoster_setup {
+  setopt LOCAL_OPTIONS
+  unsetopt XTRACE KSH_ARRAYS
+  prompt_opts=(cr percent subst)
+
+  # Load required functions.
+  autoload -Uz add-zsh-hook
+  autoload -Uz vcs_info
+
+  # Add hook for calling git-info before each command.
+  add-zsh-hook precmd prompt_agnoster_precmd
+
+  zstyle ':prezto:module:editor' completing '%B%F{red}...%f%b'
+  # zstyle ':prezto:module:editor:keymap' primary ' %B%F{red}❯%F{yellow}❯%F{green}❯%f%b'
+  # zstyle ':prezto:module:editor:keymap' alternate ' %B%F{green}❮%F{yellow}❮%F{red}❮%f%b'
+  zstyle ':prezto:module:editor:info:keymap:primary' format ''
+  zstyle ':prezto:module:editor:info:keymap:alternate' format  '❮cmd❯'
+  zstyle ':prezto:module:editor:info:keymap:primary:insert' format '❮ins❯'
+  zstyle ':prezto:module:editor:info:keymap:primary:overwrite' format '❮ovr❯'
+  zstyle ':prezto:module:git' action ':%%B%F{yellow}%s%f%%b'
+  zstyle ':prezto:module:git' added ' %%B%F{green}✚%f%%b'
+  zstyle ':prezto:module:git' ahead ' %%B%F{yellow}⬆%f%%b'
+  zstyle ':prezto:module:git' behind ' %%B%F{yellow}⬇%f%%b'
+  zstyle ':prezto:module:git' branch ':%F{green}%b%f'
+  zstyle ':prezto:module:git' commit ':%F{green}%.7c%f'
+  zstyle ':prezto:module:git' deleted ' %%B%F{red}✖%f%%b'
+  zstyle ':prezto:module:git' modified ' %%B%F{blue}✱%f%%b'
+  zstyle ':prezto:module:git' position ':%F{green}%p%f'
+  zstyle ':prezto:module:git' renamed ' %%B%F{magenta}➜%f%%b'
+  zstyle ':prezto:module:git' stashed ' %%B%F{cyan}✭%f%%b'
+  zstyle ':prezto:module:git' unmerged ' %%B%F{yellow}═%f%%b'
+  zstyle ':prezto:module:git' untracked ' %%B%F{white}◼%f%%b'
+  zstyle ':prezto:module:git' info \
+    'prompt'  ' %F{blue}git%f$(coalesce "%b" "%p" "%c")%s' \
+    'rprompt' '%A%B%S%a%d%m%r%U%u'
+
+  local branch_format="⭠ %b%f %.7i%c%u%m"
+  local action_format="%F{196}(%a)%f"
+
+  # Set vcs_info parameters
+  zstyle ':vcs_info:*' enable bzr git hg svn
+  zstyle ':vcs_info:*:prompt:*' check-for-changes true
+  zstyle ':vcs_info:*:prompt:*' get-revision-true
+  zstyle ':vcs_info:*:prompt:*' unstagedstr "%F{160}✗%f"
+  zstyle ':vcs_info:*:prompt:*' stagedstr "±"
+  zstyle ':vcs_info:*:prompt:*' formats "${branch_format}"
+  zstyle ':vcs_info:*:prompt:*' actionformats "${action_format}${branch_format}"
+  zstyle ':vcs_info:*git*+set-message:*' hooks git-st git-stash git-untracked
+
+
+# Original theme's comments left intact:
+
+# vim:ft=zsh ts=2 sw=2 sts=2
+#
+# agnoster's Theme - https://gist.github.com/3712874
+# A Powerline-inspired theme for ZSH
+#
+# # README
+#
+# In order for this theme to render correctly, you will need a
+# [Powerline-patched font](https://gist.github.com/1595572).
+#
+# In addition, I recommend the
+# [Solarized theme](https://github.com/altercation/solarized/) and, if you're
+# using it on Mac OS X, [iTerm 2](http://www.iterm2.com/) over Terminal.app -
+# it has significantly better color fidelity.
+#
+# # Goals
+#
+# The aim of this theme is to only show you *relevant* information. Like most
+# prompts, it will only show git information when in a git working directory.
+# However, it goes a step further: everything from the current user and
+# hostname to whether the last call exited with an error to whether background
+# jobs are running in this shell will all be displayed automatically when
+# appropriate.
+
+### Segment drawing
+# A few utility functions to make it easy and re-usable to draw segmented prompts
+
+CURRENT_BG='NONE'
+SEGMENT_SEPARATOR='⮀'
+
+PROMPT='%{%f%b%k%}$(build_prompt) '
+
+}
+
+function +vi-git-st() {
+  local ahead behind remote
+  local -a gitstatus
+
+  # Are we on a remote tracking branch
+  remote=${$(git rev-parse --verify ${hook_com[branch]}@{upstream} \
+    --symbolic-full-name --abbrev-ref 2>/dev/null)}
+
+  if [[ -n ${remote} ]]; then
+    ahead=$(git rev-list ${hook_com[branch]}@{upstream}..HEAD 2>/dev/null | wc -l)
+    (( $ahead )) && gitstatus+=(" %F{100}∆${ahead//[[:space:]]/}%f")
+    behind=$(git rev-list HEAD..${hook_com[branch]}@{upstream} 2>/dev/null | wc -l)
+    (( $behind )) && gitstatus+=(" %F{124}∇${behind//[[:space:]]/}%f")
+    user_data[gitstatus]=${gitstatus}
+    hook_com[branch]="${hook_com[branch]}%f${(j::)gitstatus}"
+  fi
+}
+
+function +vi-git-stash() {
+  local -a stashes
+
+  if [[ -s ${hook_com[base]}/.git/refs/stash ]]; then
+    stashes=$(git stash list 2>/dev/null | wc -l )
+    hook_com[misc]+=" %F{242}(${stashes//[[:space:]]/} stashed) %f"
+  fi
+}
+
+function +vi-git-untracked() {
+  local untracked
+  untracked=${$(git ls-files --exclude-standard --others | head -n 1)}
+  if [[ -n ${untracked} ]]; then
+    hook_com[unstaged]="${hook_com[unstaged]}%F{27}?%f"
+  fi
+}
+
+prompt_agnoster_setup "$@"
+
