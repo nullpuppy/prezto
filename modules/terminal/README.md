@@ -13,6 +13,10 @@ directory, add the following to *zpreztorc*:
 
     zstyle ':prezto:module:terminal' auto-title 'yes'
 
+Auto titling is disabled inside terminal multiplexers, except inside dvtm, since
+it interferes with window names defined in configuration files and profile
+managers.
+
 To format terminal window and tab titles, add the following to *zpreztorc*:
 
     zstyle ':prezto:module:terminal:window-title' format '%n@%m: %s'
@@ -26,19 +30,14 @@ For a list of sequences, see [Expansion of Prompt Sequences][1].
 Functions
 ---------
 
-- `set-screen-window-title` sets the screen title.
-- `set-terminal-tab-title` sets the terminal tab title.
-- `set-terminal-window-title` sets the terminal window title.
-- `set-titles-with-command` sets the screen and terminal titles with
-  a given command.
-- `set-titles-with-path` sets the screen and terminal titles with a given path.
+- `set-tab-title` sets the terminal tab title.
+- `set-window-title` sets the terminal or terminal multiplexer window title.
 
 Authors
 -------
 
 *The authors of this module should be contacted via the [issue tracker][2].*
 
-  - [James Cox](https://github.com/imajes)
   - [Sorin Ionescu](https://github.com/sorin-ionescu)
 
 [1]: http://zsh.sourceforge.net/Doc/Release/Prompt-Expansion.html#Expansion-of-Prompt-Sequences
